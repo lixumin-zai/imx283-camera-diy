@@ -63,3 +63,12 @@
 - 自动根据场景调节参数
     - 自动根据光照温度调节参数
     - 识别场景给出推荐参数
+
+
+## 开发工具
+> python
+libcamera 
+rpicam-apps 
+sherpa-ncnn 
+rasa 
+tauri
