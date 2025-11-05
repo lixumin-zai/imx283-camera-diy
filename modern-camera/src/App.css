@@ -146,3 +146,76 @@ body {
   -ms-user-select: none;
   user-select: none;
 }
+
+/* rpicam 模式提示 */
+.rpi-banner {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  z-index: 10;
+  font-size: 14px;
+}
+
+/* 媒体库侧栏 */
+.gallery {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  bottom: 20px;
+  width: 280px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  z-index: 11;
+}
+
+.gallery-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.refresh-button {
+  padding: 6px 12px;
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.gallery-list {
+  flex: 1;
+  overflow: auto;
+  padding: 10px;
+}
+
+.gallery-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.gallery-empty {
+  opacity: 0.7;
+  padding: 16px;
+  text-align: center;
+}

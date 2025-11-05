@@ -1,11 +1,20 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
 function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [mode, setMode] = useState<"rpi" | "web">("web");
+  const [isStreaming, setIsStreaming] = useState(false); // web 模式流状态
   const [error, setError] = useState<string>("");
   const [stream, setStream] = useState<MediaStream | null>(null);
+
+  // rpicam 模式状态
+  const [isPreview, setIsPreview] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [saveDir, setSaveDir] = useState<string>("");
+  const [gallery, setGallery] = useState<string[]>([]);
+  const openerRef = useRef<null | ((target: string) => Promise<void>)>(null);
 
   const startCamera = async () => {
     try {
@@ -41,7 +50,7 @@ function App() {
     setIsStreaming(false);
   };
 
-  const capturePhoto = () => {
+  const capturePhotoWeb = () => {
     if (videoRef.current) {
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
@@ -67,14 +76,105 @@ function App() {
     }
   };
 
+  // ===== rpicam 模式相关逻辑 =====
+  const startPreview = async () => {
+    try {
+      await invoke("start_preview");
+      setIsPreview(true);
+    } catch (e) {
+      console.error(e);
+      setError("启动 rpicam 预览失败");
+    }
+  };
+
+  const stopPreview = async () => {
+    try {
+      await invoke("stop_preview");
+      setIsPreview(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const captureStill = async () => {
+    try {
+      const path = await invoke<string>("capture_still", { dir: saveDir || undefined });
+      setGallery((g) => [path, ...g]);
+    } catch (e) {
+      console.error(e);
+      setError("拍照失败，请检查 rpicam-still 是否可用");
+    }
+  };
+
+  const startVideo = async () => {
+    try {
+      const path = await invoke<string>("start_video", { dir: saveDir || undefined });
+      setIsRecording(true);
+      setGallery((g) => [path, ...g]);
+    } catch (e) {
+      console.error(e);
+      setError("启动录像失败，请检查 rpicam-vid 是否可用");
+    }
+  };
+
+  const stopVideo = async () => {
+    try {
+      await invoke("stop_video");
+      setIsRecording(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const refreshGallery = async () => {
+    try {
+      const files = await invoke<string[]>("list_media", { dir: saveDir || undefined });
+      setGallery(files);
+    } catch (e) {
+      // ignore errors in non-rpi environment
+    }
+  };
+
   useEffect(() => {
-    // 组件挂载时自动启动摄像头
-    startCamera();
+    // 尝试动态加载 opener 插件（仅在 Tauri 原生可用）
+    (async () => {
+      try {
+        const mod: any = await import("@tauri-apps/plugin-opener");
+        if (mod && typeof mod.open === "function") {
+          openerRef.current = mod.open as (t: string) => Promise<void>;
+        }
+      } catch {
+        // 在纯 Web 环境会失败，忽略即可
+      }
+    })();
+
+    // 组件挂载时：优先使用 rpicam；不可用则回退到浏览器摄像头
+    (async () => {
+      try {
+        const available = await invoke<boolean>("check_rpicam");
+        if (available) {
+          setMode("rpi");
+          await refreshGallery();
+        } else {
+          setMode("web");
+          startCamera();
+        }
+      } catch (e) {
+        setMode("web");
+        startCamera();
+      }
+    })();
 
     // 清理函数
     return () => {
-      stopCamera();
+      if (mode === "web") {
+        stopCamera();
+      } else {
+        if (isPreview) void stopPreview();
+        if (isRecording) void stopVideo();
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -82,37 +182,81 @@ function App() {
       {error && (
         <div className="error-message">
           {error}
-          <button onClick={startCamera} className="retry-button">
-            重试
-          </button>
+          {mode === "web" && (
+            <button onClick={startCamera} className="retry-button">重试</button>
+          )}
         </div>
       )}
-      
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className="camera-video"
-      />
-      
-      {isStreaming && (
-        <div className="camera-controls">
-          <button onClick={capturePhoto} className="capture-button">
-            📷
-          </button>
-          <button onClick={stopCamera} className="stop-button">
-            ⏹️
-          </button>
-        </div>
+
+      {mode === "web" && (
+        <>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="camera-video"
+          />
+          {isStreaming && (
+            <div className="camera-controls">
+              <button onClick={capturePhotoWeb} className="capture-button">📷</button>
+              <button onClick={stopCamera} className="stop-button">⏹️</button>
+            </div>
+          )}
+          {!isStreaming && !error && (
+            <div className="start-screen">
+              <button onClick={startCamera} className="start-button">启动摄像头</button>
+            </div>
+          )}
+        </>
       )}
-      
-      {!isStreaming && !error && (
-        <div className="start-screen">
-          <button onClick={startCamera} className="start-button">
-            启动摄像头
-          </button>
-        </div>
+
+      {mode === "rpi" && (
+        <>
+          {/* rpicam 预览不会在此 <video> 展示，它会打开系统窗口 */}
+          <div className="rpi-banner">rpicam 模式：预览将显示在系统窗口</div>
+          <div className="camera-controls">
+            {!isPreview && (
+              <button onClick={startPreview} className="start-button">启动预览</button>
+            )}
+            {isPreview && (
+              <button onClick={stopPreview} className="stop-button">停止预览</button>
+            )}
+            <button onClick={captureStill} className="capture-button">📷</button>
+            {!isRecording && (
+              <button onClick={startVideo} className="start-button">⏺️ 录像</button>
+            )}
+            {isRecording && (
+              <button onClick={stopVideo} className="stop-button">⏹️ 停止</button>
+            )}
+          </div>
+
+          <div className="gallery">
+            <div className="gallery-header">
+              <span>媒体库</span>
+              <button className="refresh-button" onClick={refreshGallery}>刷新</button>
+            </div>
+            <div className="gallery-list">
+              {gallery.length === 0 && <div className="gallery-empty">暂无文件</div>}
+              {gallery.map((p) => {
+                const name = p.split("/").pop() || p;
+                return (
+                  <button
+                    key={p}
+                    className="gallery-item"
+                    onClick={async () => {
+                      if (openerRef.current) {
+                        await openerRef.current(p);
+                      }
+                    }}
+                  >
+                    {name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
