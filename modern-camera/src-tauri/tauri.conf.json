@@ -14,15 +14,7 @@
       {
         "title": "modern-camera",
         "width": 800,
-        "height": 600,
-        "fullscreen": true,
-        "decorations": false,
-        "resizable": true,
-        "alwaysOnTop": false,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "transparent": false,
-        "skipTaskbar": false
+        "height": 600
       }
     ],
     "security": {

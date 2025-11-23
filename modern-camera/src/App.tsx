@@ -23,7 +23,7 @@ function App() {
         video: {
           width: { ideal: 1920 },
           height: { ideal: 1080 },
-          facingMode: "environment" // 优先使用后置摄像头
+          facingMode: { ideal: "environment" }
         },
         audio: false
       });
@@ -32,6 +32,18 @@ function App() {
         videoRef.current.srcObject = mediaStream;
         setStream(mediaStream);
         setIsStreaming(true);
+        const v = videoRef.current;
+        const tryPlay = async () => {
+          try {
+            await v.play();
+          } catch (e) {
+            console.warn("自动播放失败，等待元数据加载后重试", e);
+          }
+        };
+        v.addEventListener("loadedmetadata", () => {
+          tryPlay();
+        }, { once: true });
+        tryPlay();
       }
     } catch (err) {
       console.error("摄像头访问失败:", err);
@@ -45,6 +57,7 @@ function App() {
       setStream(null);
     }
     if (videoRef.current) {
+      try { videoRef.current.pause(); } catch {}
       videoRef.current.srcObject = null;
     }
     setIsStreaming(false);
@@ -102,7 +115,7 @@ function App() {
       setGallery((g) => [path, ...g]);
     } catch (e) {
       console.error(e);
-      setError("拍照失败，请检查 rpicam-still 是否可用");
+      setError("拍照失败，请检查 rpicam-still 是否可用 " + e);
     }
   };
 

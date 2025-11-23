@@ -93,17 +93,39 @@ fn stop_preview(state: tauri::State<Mutex<CameraState>>) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn capture_still(dir: Option<String>) -> Result<String, String> {
+fn capture_still(
+    state: tauri::State<Mutex<CameraState>>,
+    dir: Option<String>,
+) -> Result<String, String> {
+    let mut st = state.lock().map_err(|_| "state lock failed".to_string())?;
+
+    // If a preview is running, we need to stop it to free the camera
+    let preview_was_running = if let Some(mut child) = st.preview.take() {
+        child
+            .kill()
+            .map_err(|e| format!("failed to stop preview for capture: {}", e))?;
+        // Wait for the process to be fully killed and camera released
+        child.wait().ok();
+        true
+    } else {
+        false
+    };
+
+    // Give a moment for the camera device to be released
+    if preview_was_running {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
     let base = dir
         .map(PathBuf::from)
-        .unwrap_or_else(|| default_media_dir());
+        .unwrap_or_else(default_media_dir);
     let out = base.join(format!("photo_{}.jpg", timestamp()));
     let out_str = out.to_string_lossy().to_string();
 
     // Prefer rpicam-still, fallback to libcamera-still
-    let cmd = if Command::new("sh")
+    let cmd_name = if Command::new("sh")
         .arg("-c")
-        .arg("command -v rpicam-still")
+        .arg("command -v rpicam-still || command -v libcamera-still")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
@@ -115,31 +137,74 @@ fn capture_still(dir: Option<String>) -> Result<String, String> {
         "libcamera-still"
     };
 
-    let status = Command::new(cmd)
+    let output = Command::new(cmd_name)
         .arg("-o")
         .arg(&out_str)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|e| format!("failed to capture still: {}", e))?;
-    if !status.success() {
-        return Err(format!("{} returned non-zero status", cmd));
+        .output()
+        .map_err(|e| format!("failed to execute {}: {}", cmd_name, e))?;
+
+    let capture_result = if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(format!(
+            "{} returned non-zero status: {}",
+            cmd_name, stderr
+        ))
+    } else {
+        Ok(out_str.clone())
+    };
+
+    // If preview was running, restart it
+    if preview_was_running {
+        let preview_cmd_name = if Command::new("sh")
+            .arg("-c")
+            .arg("command -v rpicam-hello")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+        {
+            "rpicam-hello"
+        } else {
+            "libcamera-hello"
+        };
+
+        let child = Command::new(preview_cmd_name)
+            .arg("--timeout")
+            .arg("0")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| format!("failed to restart preview: {}", e))?;
+        st.preview = Some(child);
     }
-    Ok(out_str)
+
+    capture_result
 }
 
 #[tauri::command]
 fn start_video(state: tauri::State<Mutex<CameraState>>, dir: Option<String>) -> Result<String, String> {
-    let mut st = state.lock().map_err(|_| "state lock failed")?;
+    let mut st = state.lock().map_err(|_| "state lock failed".to_string())?;
     if st.video.is_some() {
         // already recording
         if let Some(child) = &st.video {
             return Ok(format!("pid:{}", child.id()));
         }
     }
+
+    // If a preview is running, we need to stop it to free the camera
+    if let Some(mut child) = st.preview.take() {
+        child
+            .kill()
+            .map_err(|e| format!("failed to stop preview for video recording: {}", e))?;
+        // Wait for the process to be fully killed and camera released
+        child.wait().ok();
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+
     let base = dir
         .map(PathBuf::from)
-        .unwrap_or_else(|| default_media_dir());
+        .unwrap_or_else(default_media_dir);
     let out = base.join(format!("video_{}.h264", timestamp()));
     let out_str = out.to_string_lossy().to_string();
 
