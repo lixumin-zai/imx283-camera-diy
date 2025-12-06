@@ -36,7 +36,7 @@ pid_t start_camera_process(const std::string& output_filename) {
             (char*)"rpicam-still", "-t", (char*)"0", "-s",
             (char*)"--viewfinder-width", (char*)"800",
             (char*)"--viewfinder-height", (char*)"600",
-            (char*)"--rotation", (char*)"180",
+            (char*)"--vflip", (char*)"--hflip",
             (char*)"-o", (char*)output_filename.c_str(), nullptr
         };
         execvp(args[0], args);

@@ -219,3 +219,58 @@ body {
   padding: 16px;
   text-align: center;
 }
+
+/* 响应式布局：针对小屏幕（如树莓派触摸屏） */
+@media (max-width: 768px) {
+  .camera-controls {
+    bottom: 20px;
+    gap: 15px;
+  }
+
+  .capture-button,
+  .stop-button {
+    width: 60px;
+    height: 60px;
+    font-size: 24px;
+  }
+
+  .control-button {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .gallery {
+    right: 10px;
+    left: 10px;
+    top: 10px;
+    bottom: auto;
+    width: auto;
+    height: 140px;
+    flex-direction: column;
+  }
+
+  .gallery-list {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .gallery-item {
+    flex: 0 0 120px; /* 固定宽度，不允许收缩 */
+    height: 80px;
+    padding: 8px;
+    margin-bottom: 0;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .rpi-banner {
+    top: 160px; /* 下移以避开顶部的 gallery */
+  }
+}
