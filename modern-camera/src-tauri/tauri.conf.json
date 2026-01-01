@@ -13,8 +13,11 @@
     "windows": [
       {
         "title": "modern-camera",
-        "width": 800,
-        "height": 600
+        "width": 1280,
+        "height": 800,
+        "resizable": true,
+        "transparent": false,
+        "decorations": true
       }
     ],
     "security": {
