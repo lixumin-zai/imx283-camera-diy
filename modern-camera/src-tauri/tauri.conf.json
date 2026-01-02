@@ -15,9 +15,7 @@
         "title": "modern-camera",
         "width": 1280,
         "height": 800,
-        "resizable": true,
-        "transparent": false,
-        "decorations": true
+        "resizable": true
       }
     ],
     "security": {
